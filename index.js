@@ -1,6 +1,8 @@
 const express = require('express');
+const app = express();
 const ejs = require('ejs');
 require('dotenv').config();
+const http = require("http").Server(app);
 const session=require('express-session');
 const flash=require('connect-flash');
 const bodyParser = require('body-parser');
@@ -17,8 +19,7 @@ const chatDemo = require('./routes/chatdemo');
 
 const ratingRouter = require('./routes/rating');
 
-const app = express();
-
+const io = require('socket.io')(http);
 
 mongoose.connect(process.env.MONGOLOCAL_URL, {
     useNewUrlParser: true,
@@ -42,6 +43,8 @@ mongoose.connect(process.env.MONGOLOCAL_URL, {
 //   console.log('Redis error: ', err);
 // });
 
+
+
 const oneDay = 1000 * 60 * 60 * 24;
 app.use(session({
     secret: "thisismysecretkey",
@@ -54,6 +57,7 @@ app.use(session({
 app.use(flash());
 
 app.use(express.static('public'));
+app.use(express.static('pages'));
 app.set("view engine", "ejs");
 app.set('views', 'pages');
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -75,6 +79,22 @@ app.use(chatRouter);
 app.use(ratingRouter);
 
 app.use(chatDemo);
+
+io.on('connection', onConnected)
+
+function onConnected(socket) {
+  console.log('Socket connected', socket.id)
+
+  socket.on('disconnect', () => {
+    console.log('Socket disconnected', socket.id)
+  })
+
+  socket.on('message', (data) => {
+    // console.log(data)
+    socket.broadcast.emit('chat-message', data)
+  })
+
+}
 
 app.get('/get-session', (req, res) =>{
   res.send(req.session);
@@ -108,6 +128,6 @@ app.get('/create_data_redis', (req,res) =>{
   });
 });
 
-app.listen(process.env.PORT, () => {
+http.listen(process.env.PORT, () => {
   console.log(`Example app listening on port ${process.env.PORT}`)
 })
